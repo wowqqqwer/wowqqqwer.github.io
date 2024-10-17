@@ -27,7 +27,7 @@ window.onload = function init(){
 	]);
 
 	// Configure WebGL
-	gl.viewport( 0, 0, canvas.width/2, canvas.height/2 );
+	gl.viewport( 0, 0, canvas.width, canvas.height );
 	gl.clearColor( 0.0, 0.0, 0.0, 0.0 );//背景颜色
 
 	// Load shaders and initialize attribute buffers
