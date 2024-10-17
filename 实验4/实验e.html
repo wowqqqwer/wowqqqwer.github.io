@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Square with Translation</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        img {
+        	width: 600px;
+        	height: 600px;
+        	position: relative;
+        	top: -300px;
+        	left: 0px;
+        	z-index: 0;
+        }
+		canvas{
+			position: relative;
+			top: 300px;
+			left: 0px;
+			z-index: 1;
+		}
+		h1{
+			position: relative;
+			top: 300px;
+		}
+		div{
+			position: relative;
+			top: -300px;
+		}
+    </style>
+</head>
+<body>
+	<h1>任务e：迷宫</h1><br>
+    <canvas id="glCanvas" width="600" height="600"></canvas>
+	<img id="img" src="迷宫.jpg"/>
+    <div>
+        <label for="translateXSlider">左右平移:</label>
+        <input type="range" id="translateXSlider" min="-1" max="1" step="0.01" value="0" style="width: 400px;">
+    </div>
+    <div>
+        <label for="translateYSlider">上下平移:</label>
+        <input type="range" id="translateYSlider" min="-1" max="1" step="0.01" value="0" style="width: 400px;">
+    </div>
+	<div><a href="index.html">返回</a></div>
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            console.error('WebGL not supported');
+        }
+
+        // Vertex shader program
+        const vsSource = `
+            attribute vec2 aVertexPosition;
+            uniform vec2 uTranslation;
+            void main(void) {
+                gl_Position = vec4(aVertexPosition + uTranslation, 0.0, 1.0);
+            }
+        `;
+
+        // Fragment shader program
+        const fsSource = `
+            void main(void) {
+                gl_FragColor = vec4(1.0, 0.4, 0.0, 1.0); // Blue color
+            }
+        `;
+
+        // Initialize a shader program
+        const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+
+        // Collect shader program info
+        const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            },
+            uniformLocations: {
+                translation: gl.getUniformLocation(shaderProgram, 'uTranslation'),
+            },
+        };
+
+        // Set up buffers
+        const buffers = initBuffers(gl);
+
+        // Draw the scene
+        function render() {
+            drawScene(gl, programInfo, buffers);
+        }
+
+        // Handle translation slider input
+        document.getElementById('translateXSlider').addEventListener('input', render);
+        document.getElementById('translateYSlider').addEventListener('input', render);
+
+        render();
+
+        function initShaderProgram(gl, vsSource, fsSource) {
+            const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+                return null;
+            }
+            return shaderProgram;
+        }
+
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function initBuffers(gl) {
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+            const positions = [
+                -0.03,  0.03,
+                 0.03,  0.03,
+                -0.03, -0.03,
+                 0.03, -0.03,
+            ];
+
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+            return {
+                position: positionBuffer,
+            };
+        }
+
+        function drawScene(gl, programInfo, buffers) {
+            gl.clearColor(0.0, 0.0, 0.0, 0.0);  // Clear to white
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            const translateX = parseFloat(document.getElementById('translateXSlider').value);
+            const translateY = parseFloat(document.getElementById('translateYSlider').value);
+
+            gl.useProgram(programInfo.program);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.vertexAttribPointer(
+                programInfo.attribLocations.vertexPosition,
+                2,
+                gl.FLOAT,
+                false,
+                0,
+                0
+            );
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+            gl.uniform2f(programInfo.uniformLocations.translation, translateX, translateY);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+    </script>
+</body>
+</html>

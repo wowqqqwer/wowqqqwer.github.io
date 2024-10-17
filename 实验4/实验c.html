@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Square with Rotation</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+    </style>
+</head>
+<body>
+	<h1>任务c</h1><br>
+    <canvas id="glCanvas" width="400" height="400"></canvas>
+    <div>
+        <label for="rotateXSlider">X旋转:</label>
+        <input type="range" id="rotateXSlider" min="0" max="360" step="1" value="0" style="width: 400px;">
+    </div>
+    <div>
+        <label for="rotateYSlider">Y旋转:</label>
+        <input type="range" id="rotateYSlider" min="0" max="360" step="1" value="0" style="width: 400px;">
+    </div>
+	<div><a href="index.html">返回</a></div>
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+		
+
+        if (!gl) {
+            console.error('WebGL not supported');
+        }
+
+        // Vertex shader program
+        const vsSource = `
+            attribute vec4 aVertexPosition;
+            uniform mat4 uModelViewMatrix;
+            void main(void) {
+                gl_Position = uModelViewMatrix * aVertexPosition;
+            }
+        `;
+
+        // Fragment shader program
+        const fsSource = `
+            void main(void) {
+                gl_FragColor = vec4(1.0, 0.4, 0.0, 1.0); // Blue color
+            }
+        `;
+
+        // Initialize a shader program
+        const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+
+        // Collect shader program info
+        const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            },
+            uniformLocations: {
+                modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            },
+        };
+
+        // Set up buffers
+        const buffers = initBuffers(gl);
+
+        // Draw the scene
+        function render() {
+            drawScene(gl, programInfo, buffers);
+        }
+
+        // Handle rotation slider input
+        document.getElementById('rotateXSlider').addEventListener('input', render);
+        document.getElementById('rotateYSlider').addEventListener('input', render);
+
+        render();
+
+        function initShaderProgram(gl, vsSource, fsSource) {
+            const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+                return null;
+            }
+            return shaderProgram;
+        }
+
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function initBuffers(gl) {
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+            const positions = [
+                -0.5,  0.5,  0.0,
+                 0.5,  0.5,  0.0,
+                -0.5, -0.5,  0.0,
+                 0.5, -0.5,  0.0,
+            ];
+
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+            return {
+                position: positionBuffer,
+            };
+        }
+
+        function drawScene(gl, programInfo, buffers) {
+            gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to white
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            const rotateX = parseFloat(document.getElementById('rotateXSlider').value) * Math.PI / 180;
+            const rotateY = parseFloat(document.getElementById('rotateYSlider').value) * Math.PI / 180;
+
+            const modelViewMatrix = mat4.create();
+
+            mat4.rotateX(modelViewMatrix, modelViewMatrix, rotateX);
+            mat4.rotateY(modelViewMatrix, modelViewMatrix, rotateY);
+
+            gl.useProgram(programInfo.program);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.vertexAttribPointer(
+                programInfo.attribLocations.vertexPosition,
+                3,
+                gl.FLOAT,
+                false,
+                0,
+                0
+            );
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+            gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/toji/gl-matrix@v2.8.1/dist/gl-matrix-min.js"></script>
+</body>
+</html>
