@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-type" content="text/html;charset=utf-8">
+	<title>Chap4 Demo</title>
+	<style>
+	    body{
+	        position: relative;
+	        left: 600px;
+	        top: 400px;
+	        transform: translate(-50%, -50%);
+	        text-align: center;
+	    }
+	</style>
+	<script id="vertex-shader" type="x-shader/x-vertex">
+	#version 300 es
+	in vec4 vPosition;
+	in vec4 vColor;
+	out vec4 aColor;
+
+	uniform vec4 r;
+	vec4 multq(vec4 a, vec4 b)
+	{
+		return(vec4(a.x*b.x-dot(a.yzw,b.yzw), a.x*b.yzw+b.x*a.yzw+cross(b.yzw,a.yzw)));
+	}
+
+	vec4 invq(vec4 a)
+	{
+		return (vec4(a.x, -a.yzw)/dot(a,a));
+	}
+
+	void main()
+	{
+		vec4 p;
+		p=vec4(0.0, vPosition.xyz);
+		p=multq(r, multq(p,invq(r)));
+		gl_Position = vec4(p.yzw, 1.0);
+		aColor = vColor;
+	}
+	</script>
+
+	<script id="fragment-shader" type="x-shader/x-fragment">
+	#version 300 es
+	precision mediump float;
+	in vec4 aColor;
+	out vec4 fColor;
+
+	void main()
+	{
+		fColor = aColor;
+	}
+	</script>
+	<script type="text/javascript" src="common/webgl-utils.js"></script>
+	<script type="text/javascript" src="common/initShaders.js"></script>
+	<script type="text/javascript" src="common/gl-Matrix.js"></script>
+	
+	<script type="text/javascript" src="js/rotcubetrackq.js"></script>
+</head>
+<body onload="initCube()">
+<h1>实验d</h1>
+<canvas id="gl-canvas" width="600" height="600">
+你的浏览器不支持HTML5 canvas元素
+</canvas>
+<div><a href="index.html">返回</a></div>
+</body>
+</html>

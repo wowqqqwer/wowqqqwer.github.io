@@ -1,0 +1,318 @@
+<!DOCTYPE html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Interactive Scene</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+        #controls {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+	<h2>实验e</h2>
+    <div id="controls">
+        <select id="shapeSelector">
+            <option value="triangle">正三角形</option>
+            <option value="square">正方形</option>
+            <option value="cube">立方体</option>
+            <option value="circle">圆</option>
+        </select>
+        <input type="color" id="colorPicker" value="#ff0000">
+        <button id="clearScene">清空场景</button>
+        <div id="circleControls">
+            <label for="circleSides">圆的边数:</label>
+            <input type="range" id="circleSides" min="3" max="100" value="30">
+        </div>
+    </div>
+    <canvas id="glCanvas" width="800" height="600"></canvas>
+	<div><a href="index.html">返回</a></div>
+    <script src="https://cdn.jsdelivr.net/gh/toji/gl-matrix@v2.8.1/dist/gl-matrix-min.js"></script>
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            console.error('WebGL not supported');
+        }
+
+        const shapeSelector = document.getElementById('shapeSelector');
+        const colorPicker = document.getElementById('colorPicker');
+        const clearButton = document.getElementById('clearScene');
+        const circleControls = document.getElementById('circleControls');
+        const circleSidesSlider = document.getElementById('circleSides');
+
+        let objects = [];
+
+        function clearScene() {
+            objects = [];
+        }
+
+        clearButton.addEventListener('click', clearScene);
+
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const color = hexToRgb(colorPicker.value);
+            const shape = shapeSelector.value;
+            const sides = parseInt(circleSidesSlider.value);
+
+            objects.push({ shape, x, y, color, sides, time: 0 });
+        });
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return [r / 255, g / 255, b / 255, 1.0];
+        }
+
+        function initShaderProgram(gl, vsSource, fsSource) {
+            const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+                return null;
+            }
+            return shaderProgram;
+        }
+
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function createTriangle() {
+            return {
+                positions: [
+                    0.0,  1.0,  0.0,
+                   -0.87, -0.5,  0.0,
+                    0.87, -0.5,  0.0,
+                ],
+                indices: [0, 1, 2],
+                animation: 'scale'
+            };
+        }
+
+        function createSquare() {
+            return {
+                positions: [
+                    -1.0,  1.0,  0.0,
+                     1.0,  1.0,  0.0,
+                     1.0, -1.0,  0.0,
+                    -1.0, -1.0,  0.0,
+                ],
+                indices: [0, 1, 2, 0, 2, 3],
+                animation: 'rotate'
+            };
+        }
+
+        function createCube() {
+            return {
+                positions: [
+                    -0.5, -0.5,  0.5,
+                     0.5, -0.5,  0.5,
+                     0.5,  0.5,  0.5,
+                    -0.5,  0.5,  0.5,
+                    -0.5, -0.5, -0.5,
+                     0.5, -0.5, -0.5,
+                     0.5,  0.5, -0.5,
+                    -0.5,  0.5, -0.5,
+                ],
+                indices: [
+                    0, 1, 2,  0, 2, 3,  // front
+                    4, 5, 6,  4, 6, 7,  // back
+                    3, 2, 6,  3, 6, 7,  // top
+                    4, 5, 1,  4, 1, 0,  // bottom
+                    1, 5, 6,  1, 6, 2,  // right
+                    4, 0, 3,  4, 3, 7,  // left
+                ],
+                animation: 'rotate3D'
+            };
+        }
+
+        function createCircle(sides) {
+            const positions = [];
+            const indices = [];
+            const radius = 1.0;
+
+            positions.push(0.0, 0.0, 0.0);  // Center point
+
+            for (let i = 0; i <= sides; i++) {
+                const angle = (i / sides) * 2 * Math.PI;
+                const x = radius * Math.cos(angle);
+                const y = radius * Math.sin(angle);
+                positions.push(x, y, 0.0);
+                if (i > 0) {
+                    indices.push(0, i, i + 1);
+                }
+            }
+
+            return {
+                positions,
+                indices,
+                animation: 'translate'
+            };
+        }
+
+        function drawScene() {
+            gl.clearColor(1.0, 1.0, 1.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            objects.forEach(obj => {
+                let shapeData;
+                if (obj.shape === 'triangle') {
+                    shapeData = createTriangle();
+                    animateScale(obj, shapeData);
+                } else if (obj.shape === 'square') {
+                    shapeData = createSquare();
+                    animateRotate(obj, shapeData);
+                } else if (obj.shape === 'cube') {
+                    shapeData = createCube();
+                    animateRotate3D(obj, shapeData);
+                } else if (obj.shape === 'circle') {
+                    shapeData = createCircle(obj.sides);
+                    animateTranslate(obj, shapeData);
+                }
+
+                const { positions, indices } = shapeData;
+
+                // Create and bind buffers
+                const positionBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+                const indexBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+                const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+                const programInfo = {
+                    program: shaderProgram,
+                    attribLocations: {
+                        vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+                    },
+                    uniformLocations: {
+                        projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+                        uColor: gl.getUniformLocation(shaderProgram, 'uColor'),
+                    },
+                };
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.vertexAttribPointer(
+                    programInfo.attribLocations.vertexPosition,
+                    3,
+                    gl.FLOAT,
+                    false,
+                    0,
+                    0
+                );
+                gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+                gl.useProgram(programInfo.program);
+
+                const projectionMatrix = mat4.create();
+                mat4.perspective(projectionMatrix, 45 * Math.PI / 180, canvas.clientWidth / canvas.clientHeight, 0.1, 100.0);
+
+                const modelViewMatrix = mat4.create();
+                mat4.translate(modelViewMatrix, modelViewMatrix, [-1 + 2 * obj.x / canvas.width, 1 - 2 * obj.y / canvas.height, -6.0]);
+
+                gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+                gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+                gl.uniform4fv(programInfo.uniformLocations.uColor, obj.color);
+
+                const vertexCount = indices.length;
+                const type = gl.UNSIGNED_SHORT;
+                gl.drawElements(gl.TRIANGLES, vertexCount, type, 0);
+
+                obj.time += 0.01;
+            });
+
+            requestAnimationFrame(drawScene);
+        }
+
+        // Animation functions
+        function animateScale(obj, shapeData) {
+            const scale = 0.75 + 0.25 * Math.sin(obj.time * 2);
+            shapeData.positions = shapeData.positions.map((v, i) => i % 3 !== 2 ? v * scale : v);
+        }
+
+        function animateRotate(obj, shapeData) {
+            const angle = obj.time;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            shapeData.positions = shapeData.positions.map((v, i) => {
+                if (i % 3 === 0) return v * cosA - shapeData.positions[i + 2] * sinA;
+                if (i % 3 === 2) return v * cosA + shapeData.positions[i - 2] * sinA;
+                return v;
+            });
+        }
+
+        function animateRotate3D(obj, shapeData) {
+            const angle = obj.time;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            shapeData.positions = shapeData.positions.map((v, i) => {
+                if (i % 3 === 0) return v * cosA - shapeData.positions[i + 2] * sinA;
+                if (i % 3 === 2) return v * cosA + shapeData.positions[i - 2] * sinA;
+                return v;
+            });
+        }
+
+        function animateTranslate(obj, shapeData) {
+            const dx = Math.sin(obj.time) * 0.5;
+            shapeData.positions = shapeData.positions.map((v, i) => i % 3 === 0 ? v + dx : v);
+        }
+
+        const vsSource = `
+            attribute vec4 aVertexPosition;
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+            void main(void) {
+                gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            uniform vec4 uColor;
+            void main(void) {
+                gl_FragColor = uColor;
+            }
+        `;
+
+        drawScene();
+    </script>
+</body>
+</html>

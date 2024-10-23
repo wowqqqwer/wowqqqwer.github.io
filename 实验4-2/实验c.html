@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Colored Cube with Scaling and Rotation</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+	<h1>实验c</h1>
+    <canvas id="glCanvas" width="600" height="600"></canvas>
+    <div>
+        <label for="scaleSlider">缩放:</label>
+        <input type="range" id="scaleSlider" min="0.1" max="2" step="0.01" value="1" style="width: 400px;">
+    </div>
+    <div>
+        <label for="rotateXSlider">X旋转:</label>
+        <input type="range" id="rotateXSlider" min="0" max="360" step="1" value="0" style="width: 400px;">
+    </div>
+    <div>
+        <label for="rotateYSlider">Y旋转:</label>
+        <input type="range" id="rotateYSlider" min="0" max="360" step="1" value="0" style="width: 400px;">
+    </div>
+	<div>
+	    <label for="rotateYSlider">Z旋转:</label>
+	    <input type="range" id="rotateZSlider" min="0" max="360" step="1" value="0" style="width: 400px;">
+	</div>
+	<div><a href="index.html">返回</a></div>
+	<script type="text/javascript" src="js/sy3.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/toji/gl-matrix@v2.8.1/dist/gl-matrix-min.js"></script>
+</body>
+</html>
