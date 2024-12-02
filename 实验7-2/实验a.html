@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html;charset=utf-8">
+    <title>实验a</title>
+	<style type="text/css">
+		body, html {
+			position:relative;
+		    height: 100%;
+		    margin: 0;
+		    display: flex;
+		    flex-direction: column;
+		    justify-content: center;
+		    align-items: center;
+			top: 130px;
+		}
+		canvas {
+		    border: 1px solid black;
+		}
+	</style>
+    <script id="vertex-shader" type="x-shader/x-vertex">
+#version 300 es
+out vec3 R;
+
+in vec4 vPosition;
+in vec4 vNormal;
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
+
+void main()
+{
+	gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+	vec3 eyePos = ( modelViewMatrix * vPosition ).xyz;
+	vec3 N = normalize( normalMatrix * vNormal.xyz );
+	R = reflect( eyePos, N );
+}
+	</script>
+
+	<script id="fragment-shader" type="x-shader/x-fragment">
+#version 300 es
+precision mediump float;
+
+in vec3 R;
+uniform samplerCube texMap;
+
+out vec4 fColor;
+
+void main()
+{
+	vec4 texColor = texture( texMap, R );
+	fColor = texColor;
+}
+	</script>
+
+    <script type="text/javascript" src="common/webgl-utils.js"></script>
+    <script type="text/javascript" src="common/initShaders.js"></script>
+    <script type="text/javascript" src="common/gl-matrix-min.js"></script>
+
+    <script type="text/javascript" src="js/reflectionMapSphere.js"></script>
+</head>
+
+<body>
+    <h1>环境映射球体</h1>
+    <canvas id="gl-canvas" width="600" height="600">
+        你的浏览器不支持HTML5 canvas元素
+    </canvas>
+	<div>
+    <button id="ButtonX">旋转X</button>
+    <button id="ButtonY">旋转Y</button>
+    <button id="ButtonZ">旋转Z</button>
+    <button id="ButtonT">停止</button>
+	</div>
+</body>
+</html>
