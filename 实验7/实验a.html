@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html;charset=utf-8">
+    <title>实验a</title>
+	<style>
+	    body{
+	        position:relative;
+	        height: 100%;
+	        margin: 0;
+	        display: flex;
+	        flex-direction: column;
+	        justify-content: center;
+	        align-items: center;
+			top: 30px;
+	    }
+	</style>
+	
+</head>
+<body>
+<canvas id="gl-canvas" width="500" height="500"></canvas>
+<script>
+const canvas = document.getElementById("gl-canvas");
+const gl = canvas.getContext("webgl");
+
+if (!gl) {
+    alert("WebGL isn't available");
+}
+
+// Vertex shader
+const vsSource = `
+attribute vec4 aPosition;
+attribute vec2 aTexCoord;
+varying vec2 vTexCoord;
+void main() {
+    gl_Position = aPosition;
+    vTexCoord = aTexCoord;
+}
+`;
+
+// Fragment shader
+const fsSource = `
+precision mediump float;
+varying vec2 vTexCoord;
+uniform sampler2D uTexture;
+void main() {
+    gl_FragColor = texture2D(uTexture, vTexCoord);
+}
+`;
+
+// Initialize shaders
+function initShaderProgram(gl, vsSource, fsSource) {
+    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+    const shaderProgram = gl.createProgram();
+    gl.attachShader(shaderProgram, vertexShader);
+    gl.attachShader(shaderProgram, fragmentShader);
+    gl.linkProgram(shaderProgram);
+
+    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+        return null;
+    }
+    return shaderProgram;
+}
+
+function loadShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+const programInfo = {
+    program: shaderProgram,
+    attribLocations: {
+        vertexPosition: gl.getAttribLocation(shaderProgram, 'aPosition'),
+        textureCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord'),
+    },
+    uniformLocations: {
+        uTexture: gl.getUniformLocation(shaderProgram, 'uTexture'),
+    },
+};
+
+// Create sphere data
+function createSphere(radius, latBands, longBands) {
+    const positions = [];
+    const indices = [];
+    const texCoords = [];
+
+    for (let lat = 0; lat <= latBands; ++lat) {
+        const theta = lat * Math.PI / latBands;
+        const sinTheta = Math.sin(theta);
+        const cosTheta = Math.cos(theta);
+
+        for (let long = 0; long <= longBands; ++long) {
+            const phi = long * 2 * Math.PI / longBands;
+            const sinPhi = Math.sin(phi);
+            const cosPhi = Math.cos(phi);
+
+            const x = cosPhi * sinTheta;
+            const y = cosTheta;
+            const z = sinPhi * sinTheta;
+            positions.push(radius * x, radius * y, radius * z);
+
+            const u = 1 - (long / longBands);
+            const v = 1 - (lat / latBands);
+            texCoords.push(u, v);
+        }
+    }
+
+    for (let lat = 0; lat < latBands; ++lat) {
+        for (let long = 0; long < longBands; ++long) {
+            const first = (lat * (longBands + 1)) + long;
+            const second = first + longBands + 1;
+
+            indices.push(first, second, first + 1);
+            indices.push(second, second + 1, first + 1);
+        }
+    }
+    return { positions, indices, texCoords };
+}
+
+const sphereData = createSphere(1, 30, 30);
+
+// Buffers
+const positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereData.positions), gl.STATIC_DRAW);
+
+const indexBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereData.indices), gl.STATIC_DRAW);
+
+const texCoordBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sphereData.texCoords), gl.STATIC_DRAW);
+
+// Texture
+function createCheckerboardTexture(gl, size) {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    const checkerboard = new Uint8Array(size * size * 4);
+    for (let i = 0; i < size; ++i) {
+        for (let j = 0; j < size; ++j) {
+            const offset = (i * size + j) * 4;
+            const c = (i % 2 === 0) ^ (j % 2 === 0) ? 255 : 0;
+            checkerboard[offset] = c;
+            checkerboard[offset + 1] = c;
+            checkerboard[offset + 2] = c;
+            checkerboard[offset + 3] = 255;
+        }
+    }
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, checkerboard);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    return texture;
+}
+
+const texture = createCheckerboardTexture(gl, 64);
+
+// Draw
+function drawScene(gl, programInfo) {
+    gl.clearColor(1.0, 1.0, 1.0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    gl.useProgram(programInfo.program);
+
+    // Bind position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+    // Bind texture coordinate buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+
+    // Bind texture
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(programInfo.uniformLocations.uTexture, 0);
+
+    // Draw sphere
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.drawElements(gl.TRIANGLES, sphereData.indices.length, gl.UNSIGNED_SHORT, 0);
+}
+
+drawScene(gl, programInfo);
+</script>
+</body>
+</html>
